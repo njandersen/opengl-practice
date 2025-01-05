@@ -14,7 +14,11 @@ find_package(OpenGL REQUIRED)
 
 add_executable(Practice ${SOURCES} ${GLAD_SOURCES})
 
-target_include_directories(Practice PRIVATE ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/external/glad/include ${OPENGL_INCLUDE_DIR})
+target_include_directories(Practice PRIVATE 
+  ${CMAKE_SOURCE_DIR}/include 
+  ${CMAKE_SOURCE_DIR}/external/glad/include 
+  ${CMAKE_SOURCE_DIR}/external/glm-master 
+  ${OPENGL_INCLUDE_DIR})
 target_link_directories(Practice PRIVATE ${CMAKE_SOURCE_DIR}/lib)
 target_link_libraries(Practice PRIVATE mingw32 SDL2main SDL2 OpenGL::GL)
 

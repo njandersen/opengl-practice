@@ -1,10 +1,12 @@
 #include <SDL2/SDL.h>
 #include <fstream>
 #include <glad/glad.h>
+#include <glm/glm.hpp>
+#include <glm/mat4x4.hpp>
+#include <glm/vec3.hpp>
 #include <iostream>
 #include <string>
 #include <vector>
-
 // Globals
 int gScreenHeight = 480;
 int gScreenWidth = 640;
@@ -24,6 +26,8 @@ GLuint gIndexBufferObj2 = 0;
 
 // Program Object (for our shaders)
 GLuint gGraphicsPipelineShaderProgram = 0;
+
+float g_uOffset = 0;
 
 static void GLClearAllErrors() {
   while (glGetError() != GL_NO_ERROR) {
@@ -213,6 +217,17 @@ void Input() {
       gQuit = true;
     }
   }
+
+  // Retrieve keyboard state
+  const Uint8 *state = SDL_GetKeyboardState(NULL);
+  if (state[SDL_SCANCODE_UP]) {
+    g_uOffset += 0.01f;
+    std::cout << "g_uOffset: " << g_uOffset << std::endl;
+  }
+  if (state[SDL_SCANCODE_DOWN]) {
+    g_uOffset -= 0.01f;
+    std::cout << "g_uOffset: " << g_uOffset << std::endl;
+  }
 }
 
 void PreDraw() {
@@ -225,6 +240,14 @@ void PreDraw() {
   glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 
   glUseProgram(gGraphicsPipelineShaderProgram);
+  GLint location =
+      glGetUniformLocation(gGraphicsPipelineShaderProgram, "uOffset");
+  if (location >= 0) {
+    glUniform1f(location, g_uOffset);
+    std::cout << "location of uOffset: " << location << std::endl;
+  } else {
+    std::cout << "Could not find uOffset, maybe a mispelling?\n";
+  }
 }
 
 void Draw() {
