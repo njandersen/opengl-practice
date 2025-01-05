@@ -1,0 +1,27 @@
+# Build directories
+/build/
+/.cache/
+
+# CMake files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+build.ninja
+.ninja_deps
+.ninja_log
+
+# Executables
+*.exe
+
+# Libraries
+*.a
+*.la
+*.dll
+*.dll.a
+
+# Preset files
+CMakePresets.json
+
+# Batch files
+build_and_run.bat
