@@ -19,8 +19,31 @@ GLuint gVertexArrayObj = 0;
 GLuint gVertexBufferObj = 0;
 GLuint gVertexBufferObj2 = 0;
 
+GLuint gIndexBufferObj = 0;
+GLuint gIndexBufferObj2 = 0;
+
 // Program Object (for our shaders)
 GLuint gGraphicsPipelineShaderProgram = 0;
+
+static void GLClearAllErrors() {
+  while (glGetError() != GL_NO_ERROR) {
+  }
+}
+
+static bool GLCheckErrorStatus(const char *function, int line) {
+  while (GLenum error = glGetError()) {
+    std::cout << "OpenGL Error: " << error << "\tLine: " << line
+              << "\tfunction: " << function << std::endl;
+    return true;
+  }
+
+  return false;
+}
+
+#define GLCheck(x)                                                             \
+  GLClearAllErrors();                                                          \
+  x;                                                                           \
+  GLCheckErrorStatus(#x, __LINE__);
 
 std::string LoadShaderAsString(const std::string &filename) {
   std::string result = "";
@@ -88,14 +111,24 @@ void GetOpenGLVersionInfo() {
 }
 
 void VertexSpecification() {
-  const std::vector<GLfloat> vertexPosition{// x      y       z
-                                            -0.8f, -0.8f, 0.0f, 0.8f, -0.8f,
-                                            0.0f,  0.0f,  0.8f, 0.0f};
+
+  const std::vector<GLfloat> vertexPosition{
+      // x    y    z
+      -0.5f, -0.5f, 0.0f, // Left vertex
+      0.5f, -0.5f, 0.0f,  // Right vertex
+      -0.5f, 0.5f, 0.0f,  // Top vertex
+      // Second Triangle
+
+      0.5f, 0.5f, 0.0f, // Top-right vertex
+
+  };
 
   const std::vector<GLfloat> vertexColors{
       // r   g     b
       1.0f, 0.0f, 0.0f, // Left vertex pos
       0.0f, 1.0f, 0.0f, // Right vertex pos
+      0.0f, 0.0f, 1.0f, // Top vertex pos
+                        // second triangle
       0.0f, 0.0f, 1.0f, // Top vertex pos
   };
 
@@ -116,6 +149,14 @@ void VertexSpecification() {
   glBindBuffer(GL_ARRAY_BUFFER, gVertexBufferObj2);
   glBufferData(GL_ARRAY_BUFFER, vertexColors.size() * sizeof(GLfloat),
                vertexColors.data(), GL_STATIC_DRAW);
+
+  // Setup index buffer object
+  const std::vector<GLuint> indexBufferData{2, 0, 1, 3, 2, 1};
+
+  glGenBuffers(1, &gIndexBufferObj);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gIndexBufferObj);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexBufferData.size() * sizeof(GLuint),
+               indexBufferData.data(), GL_STATIC_DRAW);
 
   glEnableVertexAttribArray(1);
   glVertexAttribPointer(1, 3, // rgb
@@ -191,7 +232,9 @@ void Draw() {
   glBindVertexArray(gVertexArrayObj);
   glBindBuffer(GL_ARRAY_BUFFER, gVertexBufferObj);
 
-  glDrawArrays(GL_TRIANGLES, 0, 3);
+  // Render Data
+  // glDrawArrays(GL_TRIANGLES, 0, 6);
+  glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 }
 
 void MainLoop() {
