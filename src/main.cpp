@@ -1,7 +1,9 @@
+#include "glm/trigonometric.hpp"
 #include <SDL2/SDL.h>
 #include <fstream>
 #include <glad/glad.h>
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 #include <iostream>
@@ -27,7 +29,9 @@ GLuint gIndexBufferObj2 = 0;
 // Program Object (for our shaders)
 GLuint gGraphicsPipelineShaderProgram = 0;
 
-float g_uOffset = 0;
+float g_uOffset = -2.0f;
+float g_uRotate = 0.0f;
+float g_uScale = 0.5f;
 
 static void GLClearAllErrors() {
   while (glGetError() != GL_NO_ERROR) {
@@ -228,6 +232,14 @@ void Input() {
     g_uOffset -= 0.01f;
     std::cout << "g_uOffset: " << g_uOffset << std::endl;
   }
+  if (state[SDL_SCANCODE_LEFT]) {
+    g_uRotate -= 1.0f;
+    std::cout << "g_uRotate: " << g_uRotate << std::endl;
+  }
+  if (state[SDL_SCANCODE_RIGHT]) {
+    g_uRotate += 1.0f;
+    std::cout << "g_uRotate: " << g_uRotate << std::endl;
+  }
 }
 
 void PreDraw() {
@@ -240,13 +252,40 @@ void PreDraw() {
   glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 
   glUseProgram(gGraphicsPipelineShaderProgram);
-  GLint location =
-      glGetUniformLocation(gGraphicsPipelineShaderProgram, "uOffset");
-  if (location >= 0) {
-    glUniform1f(location, g_uOffset);
-    std::cout << "location of uOffset: " << location << std::endl;
+
+  // Model tansformation by translating object into world space
+  glm::mat4 model =
+      glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, g_uOffset));
+
+  model =
+      glm::rotate(model, glm::radians(g_uRotate), glm::vec3(0.0f, 1.0f, 0.0f));
+  model = glm::scale(model, glm::vec3(g_uScale, g_uScale, g_uScale));
+
+  GLint u_ModelMatrixLocation =
+      glGetUniformLocation(gGraphicsPipelineShaderProgram, "uModelMatrix");
+
+  if (u_ModelMatrixLocation >= 0) {
+    glUniformMatrix4fv(u_ModelMatrixLocation, 1, GL_FALSE, &model[0][0]);
+    std::cout << "location of uModelMatrix: " << u_ModelMatrixLocation
+              << std::endl;
   } else {
-    std::cout << "Could not find uOffset, maybe a mispelling?\n";
+    std::cout << "Could not find uModelMatrix, maybe a mispelling?\n";
+    exit(EXIT_FAILURE);
+  }
+
+  glm::mat4 perspective =
+      glm::perspective(glm::radians(45.0f),
+                       (float)gScreenWidth / (float)gScreenHeight, 0.1f, 10.0f);
+
+  GLint u_ProjectionLocation =
+      glGetUniformLocation(gGraphicsPipelineShaderProgram, "uProjection");
+  if (u_ProjectionLocation >= 0) {
+    glUniformMatrix4fv(u_ProjectionLocation, 1, GL_FALSE, &perspective[0][0]);
+    std::cout << "location of uProjection: " << u_ProjectionLocation
+              << std::endl;
+  } else {
+    std::cout << "Could not find uProjection, maybe a mispelling?\n";
+    exit(EXIT_FAILURE);
   }
 }
 
