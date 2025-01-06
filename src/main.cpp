@@ -9,6 +9,9 @@
 #include <iostream>
 #include <string>
 #include <vector>
+
+// Our Libraries
+#include "Camera.hpp"
 // Globals
 int gScreenHeight = 480;
 int gScreenWidth = 640;
@@ -32,6 +35,8 @@ GLuint gGraphicsPipelineShaderProgram = 0;
 float g_uOffset = -2.0f;
 float g_uRotate = 0.0f;
 float g_uScale = 0.5f;
+
+Camera gCamera;
 
 static void GLClearAllErrors() {
   while (glGetError() != GL_NO_ERROR) {
@@ -213,32 +218,38 @@ void InitializeProgram() {
 }
 
 void Input() {
+  static int mouseX = gScreenWidth / 2;
+  static int mouseY = gScreenHeight / 2;
+
   SDL_Event e;
 
   while (SDL_PollEvent(&e) != 0) {
     if (e.type == SDL_QUIT) {
       std::cout << "Goodbye!" << std::endl;
       gQuit = true;
+    } else if (e.type == SDL_MOUSEMOTION) {
+      mouseX += e.motion.xrel;
+      mouseY += e.motion.yrel;
+      gCamera.MouseLook(mouseX, mouseY);
     }
   }
 
   // Retrieve keyboard state
   const Uint8 *state = SDL_GetKeyboardState(NULL);
-  if (state[SDL_SCANCODE_UP]) {
-    g_uOffset += 0.01f;
-    std::cout << "g_uOffset: " << g_uOffset << std::endl;
+  float speed = 0.1f;
+  if (state[SDL_SCANCODE_E]) {
+    gCamera.MoveForward(speed);
+    // g_uOffset += 0.01f;
+    // std::cout << "g_uOffset: " << g_uOffset << std::endl;
   }
-  if (state[SDL_SCANCODE_DOWN]) {
-    g_uOffset -= 0.01f;
-    std::cout << "g_uOffset: " << g_uOffset << std::endl;
+  if (state[SDL_SCANCODE_D]) {
+    gCamera.MoveBackward(speed);
   }
-  if (state[SDL_SCANCODE_LEFT]) {
-    g_uRotate -= 1.0f;
-    std::cout << "g_uRotate: " << g_uRotate << std::endl;
+  if (state[SDL_SCANCODE_S]) {
+    gCamera.MoveLeft(speed);
   }
-  if (state[SDL_SCANCODE_RIGHT]) {
-    g_uRotate += 1.0f;
-    std::cout << "g_uRotate: " << g_uRotate << std::endl;
+  if (state[SDL_SCANCODE_F]) {
+    gCamera.MoveRight(speed);
   }
 }
 
@@ -251,7 +262,10 @@ void PreDraw() {
 
   glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 
+  // Use our shader
   glUseProgram(gGraphicsPipelineShaderProgram);
+
+  g_uRotate -= 0.1f;
 
   // Model tansformation by translating object into world space
   glm::mat4 model =
@@ -273,6 +287,16 @@ void PreDraw() {
     exit(EXIT_FAILURE);
   }
 
+  glm::mat4 view = gCamera.GetViewMatrix();
+  GLint u_ViewLocation =
+      glGetUniformLocation(gGraphicsPipelineShaderProgram, "uViewMatrix");
+  if (u_ViewLocation >= 0) {
+    glUniformMatrix4fv(u_ViewLocation, 1, GL_FALSE, &view[0][0]);
+    std::cout << "location of uViewMatrix: " << u_ViewLocation << std::endl;
+  } else {
+    std::cout << "Could not find uViewMatrix, maybe a mispelling?\n";
+    exit(EXIT_FAILURE);
+  }
   glm::mat4 perspective =
       glm::perspective(glm::radians(45.0f),
                        (float)gScreenWidth / (float)gScreenHeight, 0.1f, 10.0f);
@@ -290,9 +314,8 @@ void PreDraw() {
 }
 
 void Draw() {
-
+  // Enable our attributes
   glBindVertexArray(gVertexArrayObj);
-  glBindBuffer(GL_ARRAY_BUFFER, gVertexBufferObj);
 
   // Render Data
   // glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -300,6 +323,9 @@ void Draw() {
 }
 
 void MainLoop() {
+  SDL_WarpMouseInWindow(gGraphicsAppWindow, gScreenWidth / 2,
+                        gScreenHeight / 2);
+  SDL_SetRelativeMouseMode(SDL_TRUE);
   while (!gQuit) {
     Input();
 
