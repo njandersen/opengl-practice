@@ -23,6 +23,10 @@ struct App {
   Camera mCamera;
 };
 
+struct Transform {
+  glm::vec3 translation;
+};
+
 struct Mesh3D {
   // VAO
   GLuint mVertexArrayObj = 0;
@@ -33,7 +37,9 @@ struct Mesh3D {
   GLuint mIndexBufferObj = 0;
   GLuint mIndexBufferObj2 = 0;
 
-  float m_uOffset = -2.0f;
+  GLuint mPipeline = 0;
+
+  Transform mTransform;
   float m_uRotate = 0.0f;
   float m_uScale = 0.5f;
 };
@@ -41,6 +47,17 @@ struct Mesh3D {
 // Globals
 App gApp;
 Mesh3D gMesh1;
+Mesh3D gMesh2;
+
+void MeshDelete(Mesh3D *mesh) {
+  glDeleteBuffers(1, &mesh->mVertexBufferObj);
+  glDeleteBuffers(1, &mesh->mVertexBufferObj2);
+}
+
+void MeshSetPipeline(Mesh3D *mesh, GLuint pipeline) {
+
+  mesh->mPipeline = pipeline;
+}
 
 static void GLClearAllErrors() {
   while (glGetError() != GL_NO_ERROR) {
@@ -127,7 +144,7 @@ void GetOpenGLVersionInfo() {
             << std::endl;
 }
 
-void VertexSpecification(Mesh3D *mesh) {
+void MeshCreate(Mesh3D *mesh) {
 
   const std::vector<GLfloat> vertexPosition{
       // x    y    z
@@ -183,7 +200,7 @@ void VertexSpecification(Mesh3D *mesh) {
   glDisableVertexAttribArray(0);
 }
 
-void InitializeProgram() {
+void InitializeProgram(App *app) {
   if (SDL_Init(SDL_INIT_VIDEO) < 0) {
     std::cout << "Failed to initialize the SDL2 library\n";
     exit(1);
@@ -196,18 +213,18 @@ void InitializeProgram() {
   SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
   SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 
-  gApp.mGraphicsAppWindow = SDL_CreateWindow(
+  app->mGraphicsAppWindow = SDL_CreateWindow(
       "OpenGL Window", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-      gApp.mScreenWidth, gApp.mScreenHeight, SDL_WINDOW_OPENGL);
+      app->mScreenWidth, app->mScreenHeight, SDL_WINDOW_OPENGL);
 
-  if (gApp.mGraphicsAppWindow == nullptr) {
+  if (app->mGraphicsAppWindow == nullptr) {
     std::cout << "SDL_Window was not able to be created" << std::endl;
     exit(1);
   }
 
-  gApp.mOpenGLContext = SDL_GL_CreateContext(gApp.mGraphicsAppWindow);
+  app->mOpenGLContext = SDL_GL_CreateContext(app->mGraphicsAppWindow);
 
-  if (gApp.mOpenGLContext == nullptr) {
+  if (app->mOpenGLContext == nullptr) {
     std::cout << "OpenGL context not available\n";
     exit(1);
   }
@@ -260,74 +277,61 @@ void Input() {
   }
 }
 
-void PreDraw() {
-  glDisable(GL_DEPTH_TEST);
-  glDisable(GL_CULL_FACE);
-
-  glViewport(0, 0, gApp.mScreenWidth, gApp.mScreenHeight);
-  glClearColor(1.f, 1.f, 0.1f, 1.f);
-
-  glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
-
-  // Use our shader
-  glUseProgram(gApp.mGraphicsPipelineShaderProgram);
-
-  gMesh1.m_uRotate -= 0.1f;
-
-  // Model tansformation by translating object into world space
-  glm::mat4 model =
-      glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, gMesh1.m_uOffset));
-
-  model = glm::rotate(model, glm::radians(gMesh1.m_uRotate),
-                      glm::vec3(0.0f, 1.0f, 0.0f));
-  model = glm::scale(
-      model, glm::vec3(gMesh1.m_uScale, gMesh1.m_uScale, gMesh1.m_uScale));
-
-  GLint u_ModelMatrixLocation =
-      glGetUniformLocation(gApp.mGraphicsPipelineShaderProgram, "uModelMatrix");
-
-  if (u_ModelMatrixLocation >= 0) {
-    glUniformMatrix4fv(u_ModelMatrixLocation, 1, false, &model[0][0]);
-    std::cout << "location of uModelMatrix: " << u_ModelMatrixLocation
-              << std::endl;
-  } else {
-    std::cout << "Could not find uModelMatrix, maybe a mispelling?\n";
+// Returns location of uniform var based on its name
+int FindUniformLocation(GLuint pipeline, const GLchar *name) {
+  GLint location = glGetUniformLocation(pipeline, name);
+  if (location < 0) {
+    std::cerr << "Could not find " << name << ", maybe a mispelling?\n";
     exit(EXIT_FAILURE);
   }
+  return location;
+}
+
+void MeshDraw(Mesh3D *mesh) {
+  if (mesh == nullptr) {
+    return;
+  }
+
+  // Setup which graphics pipeline we are going to use
+  glUseProgram(mesh->mPipeline);
+
+  mesh->m_uRotate -= 0.1f;
+
+  // Model tansformation by translating object into world space
+  glm::mat4 model = glm::translate(glm::mat4(1.0f),
+                                   glm::vec3(mesh->mTransform.translation.x,
+                                             mesh->mTransform.translation.y,
+                                             mesh->mTransform.translation.z));
+
+  model = glm::rotate(model, glm::radians(mesh->m_uRotate),
+                      glm::vec3(0.0f, 1.0f, 0.0f));
+  model = glm::scale(model,
+                     glm::vec3(mesh->m_uScale, mesh->m_uScale, mesh->m_uScale));
+
+  GLint u_ModelMatrixLocation =
+      FindUniformLocation(gApp.mGraphicsPipelineShaderProgram, "uModelMatrix");
+  glUniformMatrix4fv(u_ModelMatrixLocation, 1, false, &model[0][0]);
 
   glm::mat4 view = gApp.mCamera.GetViewMatrix();
   GLint u_ViewLocation =
-      glGetUniformLocation(gApp.mGraphicsPipelineShaderProgram, "uViewMatrix");
-  if (u_ViewLocation >= 0) {
-    glUniformMatrix4fv(u_ViewLocation, 1, false, &view[0][0]);
-    std::cout << "location of uViewMatrix: " << u_ViewLocation << std::endl;
-  } else {
-    std::cout << "Could not find uViewMatrix, maybe a mispelling?\n";
-    exit(EXIT_FAILURE);
-  }
-  glm::mat4 perspective = glm::perspective(
-      glm::radians(45.0f), (float)gApp.mScreenWidth / (float)gApp.mScreenHeight,
-      0.1f, 10.0f);
+      FindUniformLocation(gApp.mGraphicsPipelineShaderProgram, "uViewMatrix");
+  glUniformMatrix4fv(u_ViewLocation, 1, false, &view[0][0]);
+
+  glm::mat4 perspective = gApp.mCamera.GetProjectionMatrix();
 
   GLint u_ProjectionLocation =
-      glGetUniformLocation(gApp.mGraphicsPipelineShaderProgram, "uProjection");
-  if (u_ProjectionLocation >= 0) {
-    glUniformMatrix4fv(u_ProjectionLocation, 1, false, &perspective[0][0]);
-    std::cout << "location of uProjection: " << u_ProjectionLocation
-              << std::endl;
-  } else {
-    std::cout << "Could not find uProjection, maybe a mispelling?\n";
-    exit(EXIT_FAILURE);
-  }
-}
+      FindUniformLocation(gApp.mGraphicsPipelineShaderProgram, "uProjection");
+  glUniformMatrix4fv(u_ProjectionLocation, 1, false, &perspective[0][0]);
 
-void Draw() {
   // Enable our attributes
-  glBindVertexArray(gMesh1.mVertexArrayObj);
+  glBindVertexArray(mesh->mVertexArrayObj);
 
   // Render Data
   // glDrawArrays(GL_TRIANGLES, 0, 6);
   glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+  // Stop using our current graphics pipeline
+  glUseProgram(0);
 }
 
 void MainLoop() {
@@ -337,8 +341,17 @@ void MainLoop() {
   while (!gApp.mQuit) {
     Input();
 
-    PreDraw();
-    Draw();
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+
+    glViewport(0, 0, gApp.mScreenWidth, gApp.mScreenHeight);
+    glClearColor(1.f, 1.f, 0.1f, 1.f);
+
+    glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+
+    MeshDraw(&gMesh1);
+
+    MeshDraw(&gMesh2);
 
     // Update the screen
     SDL_GL_SwapWindow(gApp.mGraphicsAppWindow);
@@ -350,8 +363,7 @@ void CleanUp() {
   gApp.mGraphicsAppWindow = nullptr;
 
   // Delete opengl objects
-  glDeleteBuffers(1, &gMesh1.mVertexBufferObj);
-  glDeleteBuffers(1, &gMesh1.mVertexBufferObj2);
+  MeshDelete(&gMesh1);
 
   // Delete graphics pipeline
   glDeleteProgram(gApp.mGraphicsPipelineShaderProgram);
@@ -360,11 +372,27 @@ void CleanUp() {
 
 int main(int argc, char *argv[]) {
 
-  InitializeProgram();
+  InitializeProgram(&gApp);
 
-  VertexSpecification(&gMesh1);
+  // Setup camera
+  gApp.mCamera.SetProjectionMatrix(
+      glm::radians(45.0f), (float)gApp.mScreenWidth / (float)gApp.mScreenHeight,
+      0.1f, 10.0f);
+
+  MeshCreate(&gMesh1);
+  gMesh1.mTransform.translation.x = 0.0f;
+  gMesh1.mTransform.translation.y = 0.0f;
+  gMesh1.mTransform.translation.z = -2.0f;
+
+  MeshCreate(&gMesh2);
+  gMesh2.mTransform.translation.x = 2.0f;
+  gMesh2.mTransform.translation.y = 0.0f;
+  gMesh2.mTransform.translation.z = -2.0f;
 
   CreateGraphicsPipeline();
+
+  MeshSetPipeline(&gMesh1, gApp.mGraphicsPipelineShaderProgram);
+  MeshSetPipeline(&gMesh2, gApp.mGraphicsPipelineShaderProgram);
 
   MainLoop();
 

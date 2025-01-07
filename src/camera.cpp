@@ -13,6 +13,13 @@ glm::mat4 Camera::GetViewMatrix() const {
   return glm::lookAt(mEye, mEye + mViewDirection, mUpVector);
 }
 
+void Camera::SetProjectionMatrix(float fovy, float aspect, float near,
+                                 float far) {
+  mProjectionMatrix = glm::perspective(fovy, aspect, near, far);
+}
+
+glm::mat4 Camera::GetProjectionMatrix() const { return mProjectionMatrix; }
+
 void Camera::MouseLook(int mouseX, int mouseY) {
   std::cout << "mouse: " << mouseX << ", " << mouseY << std::endl;
   static const float sensitivity = 0.05f;
@@ -28,6 +35,9 @@ void Camera::MouseLook(int mouseX, int mouseY) {
   mouseDelta *= sensitivity;
   mViewDirection =
       glm::rotate(mViewDirection, glm::radians(mouseDelta.x), mUpVector);
+  // glm::vec3 right = glm::cross(mViewDirection, mUpVector);
+  // mViewDirection =
+  //     glm::rotate(mViewDirection, glm::radians(-mouseDelta.y), right);
 }
 
 void Camera::MoveForward(float speed) {
